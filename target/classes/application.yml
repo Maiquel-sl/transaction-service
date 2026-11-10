@@ -2,7 +2,7 @@ spring:
   application:
     name: transaction-service
   mongodb:
-    uri: mongodb://localhost:27017/transaction-service-db
+    uri: ${MONGODB_URI:mongodb://localhost:27017/transaction-service-db}
 
 server:
-  port: 8084
+  port: ${PORT:8084}
