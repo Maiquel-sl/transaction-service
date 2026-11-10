@@ -1,0 +1,156 @@
+openapi: 3.1.0
+info:
+  title: Bank Ledger and Audit History Microservice (transaction-service)
+  description: Reactive Open-API Contract managing unified bank ledger ingestion and high-performance querying of consolidated historical product data.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: API Gateway Entry Point
+  - url: http://localhost:8084
+    description: Direct Transaction Service Instance
+paths:
+  /api/transactions:
+    post:
+      summary: Ingest and register a systemic audit transaction record
+      description: Acts as a decoupled ledger sink allowing internal core services to asynchronously post transactional events.
+      operationId: registerTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductTransaction'
+      responses:
+        '201':
+          description: Audit ledger line populated and global transaction sequence index generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductTransaction'
+        '400':
+          description: Provided payload syntax does not comply with structural validation.
+
+  /api/transactions/customer/{customerId}:
+    get:
+      summary: Query global audit history lines for a targeted customer
+      description: Streams every historical movement (Pasivos and Activos) corresponding to a user identity.
+      operationId: getAllCustomerTransactions
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique customer hexadecimal string identifier key
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Continuous reactive array list stream of global historical data.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductTransaction'
+
+  /api/transactions/customer/{customerId}/product/{referenceNumber}:
+    get:
+      summary: Query strict descending chronological records for an isolated bank product
+      description: Resolves the business query parameter requirement by compiling sorted lists mapping exclusively onto a target reference number.
+      operationId: getProductHistory
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: referenceNumber
+          in: path
+          required: true
+          description: Targeted account number or credit card 16-digit primary identifier string
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sorted historical data stream fetched from index nodes successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductTransaction'
+
+components:
+  schemas:
+    ProductTransaction:
+      type: object
+      required:
+        - customerId
+        - product
+        - operation
+        - audit
+      properties:
+        id:
+          type: string
+          example: 65f1a2b3c4d5e6f7a8b9c301
+        transactionId:
+          type: string
+          example: TXN-20261110-8890
+        customerId:
+          type: string
+          example: 65f1a2b3c4d5e6f7a8b9c001
+        product:
+          $ref: '#/components/schemas/BankProduct'
+        operation:
+          $ref: '#/components/schemas/TransactionOperation'
+        audit:
+          $ref: '#/components/schemas/AuditData'
+
+    BankProduct:
+      type: object
+      description: Domain configuration matching Java 27 structural records.
+      properties:
+        id:
+          type: string
+          example: 65f1a2b3c4d5e6f7a8b9c101
+        type:
+          type: string
+          enum: [BANK_ACCOUNT, CREDIT, CREDIT_CARD]
+          example: BANK_ACCOUNT
+        subType:
+          type: string
+          enum: [SAVINGS, CURRENT, FIXED_TERM, PERSONAL_CREDIT, BUSINESS_CREDIT]
+          example: SAVINGS
+        referenceNumber:
+          type: string
+          example: ACC-9988776655
+
+    TransactionOperation:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [DEPOSIT, WITHDRAWAL, CREDIT_PAYMENT, CARD_CONSUMPTION, CARD_PAYMENT]
+          example: WITHDRAWAL
+        amount:
+          type: number
+          format: double
+          example: 120.00
+        currency:
+          type: string
+          example: PEN
+        description:
+          type: string
+          example: Branch ATM withdrawal operation
+
+    AuditData:
+      type: object
+      properties:
+        sourceService:
+          type: string
+          enum: [account-service, credit-service]
+          example: account-service
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-11-10T11:50:00Z'
+
