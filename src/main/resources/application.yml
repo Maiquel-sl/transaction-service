@@ -12,11 +12,11 @@ spring:
           brokers: ${KAFKA_BROKERS:localhost:9092}
       bindings:
         accountEventConsumer-in-0:
-          destination: bank-account-events
+          destination: account-events
           group: transaction-audit-group
           content-type: application/json
         creditEventConsumer-in-0:
-          destination: bank-credit-events
+          destination: credit-events
           group: transaction-audit-group
           content-type: application/json
 
