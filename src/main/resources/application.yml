@@ -3,6 +3,22 @@ spring:
     name: transaction-service
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/transaction-service-db}
+  cloud:
+    function:
+      definition: accountEventConsumer;creditEventConsumer
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+      bindings:
+        accountEventConsumer-in-0:
+          destination: bank-account-events
+          group: transaction-audit-group
+          content-type: application/json
+        creditEventConsumer-in-0:
+          destination: bank-credit-events
+          group: transaction-audit-group
+          content-type: application/json
 
 springdoc:
   api-docs:
