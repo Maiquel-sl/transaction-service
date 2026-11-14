@@ -14,13 +14,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -56,8 +55,8 @@ class ProductTransactionServiceImplTest {
 
         // Assert
         StepVerifier.create(result)
-                .expectNextMatches(tx -> 
-                        tx.getTransactionId() != null && 
+                .expectNextMatches(tx ->
+                        tx.getTransactionId() != null &&
                         tx.getTransactionId().startsWith("TXN-") &&
                         "cust-12345".equals(tx.getCustomerId())
                 )
@@ -68,12 +67,30 @@ class ProductTransactionServiceImplTest {
     @DisplayName("Should return a descending chronological stream of a specific product history")
     void testGetProductHistoryChronological() {
         // Arrange
-        Mockito.when(repository.findByCustomerIdAndProductReferenceNumberOrderByAuditTimestampDesc(
-                eq("cust-12345"), eq("ACC-778899")))
+        Mockito.when(repository.findByCustomerIdAndProduct_ReferenceNumber(
+                        eq("cust-12345"),
+                        eq("ACC-778899"),
+                        any(Sort.class)))
                 .thenReturn(Flux.just(mockTx));
 
         // Act
         Flux<ProductTransaction> result = service.getProductHistory("cust-12345", "ACC-778899");
+
+        // Assert
+        StepVerifier.create(result)
+                .expectNext(mockTx)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("Should return all transactions belonging to a customer ordered chronologically")
+    void testGetAllCustomerTransactions() {
+        // Arrange
+        Mockito.when(repository.findByCustomerId(eq("cust-12345"), any(Sort.class)))
+                .thenReturn(Flux.just(mockTx));
+
+        // Act
+        Flux<ProductTransaction> result = service.getAllCustomerTransactions("cust-12345");
 
         // Assert
         StepVerifier.create(result)

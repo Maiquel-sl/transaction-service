@@ -2,12 +2,15 @@ package com.bank.transaction.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
 
 @Document(collection = "product_transactions")
 public class ProductTransaction {
     @Id
     private String id;
     private String transactionId;
+    @Field(targetType = FieldType.OBJECT_ID)
     private String customerId;
     private BankProduct product;
     private TransactionOperation operation;
