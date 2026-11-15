@@ -13,11 +13,11 @@ spring:
       bindings:
         accountEventConsumer-in-0:
           destination: account-events
-          group: transaction-audit-group
+          group: transaction-audit-account-group
           content-type: application/json
         creditEventConsumer-in-0:
           destination: credit-events
-          group: transaction-audit-group
+          group: transaction-audit-credit-group
           content-type: application/json
 
 resilience4j:

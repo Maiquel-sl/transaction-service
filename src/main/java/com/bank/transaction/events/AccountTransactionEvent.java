@@ -9,6 +9,7 @@ public record AccountTransactionEvent(
     String accountId,
     String accountSubType, // SAVINGS, CURRENT, FIXED_TERM
     String accountNumber,
+    String cardNumber,
     String operationType,  // DEPOSIT, WITHDRAWAL
     BigDecimal amount,
     String currency,

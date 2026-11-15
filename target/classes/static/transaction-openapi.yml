@@ -1,18 +1,19 @@
 openapi: 3.1.0
 info:
-  title: Bank Ledger and Audit History Microservice (transaction-service)
-  description: Reactive Open-API Contract managing unified bank ledger ingestion and high-performance querying of consolidated historical product data.
-  version: 1.0.0
+  title: Product Transaction Ledger & Reporting Microservice (transaction-service)
+  description: Reactive Open-API Contract that consumes bank account and credit events from Apache Kafka to maintain an immutable audit ledger and generate product reports by date range and top 10 card movements.
+  version: 2.0.0
 servers:
   - url: http://localhost:8080
     description: API Gateway Entry Point
   - url: http://localhost:8084
     description: Direct Transaction Service Instance
+
 paths:
   /api/transactions:
     post:
-      summary: Ingest and register a systemic audit transaction record
-      description: Acts as a decoupled ledger sink allowing internal core services to asynchronously post transactional events.
+      summary: Register a product transaction directly into the ledger
+      description: Manually ingests a transaction record and assigns a systemic TXN- identifier (normally triggered automatically via Kafka consumers).
       operationId: registerTransaction
       requestBody:
         required: true
@@ -22,62 +23,145 @@ paths:
               $ref: '#/components/schemas/ProductTransaction'
       responses:
         '201':
-          description: Audit ledger line populated and global transaction sequence index generated.
+          description: Transaction recorded successfully in the ledger.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductTransaction'
         '400':
-          description: Provided payload syntax does not comply with structural validation.
-
-  /api/transactions/customer/{customerId}:
-    get:
-      summary: Query global audit history lines for a targeted customer
-      description: Streams every historical movement (Pasivos and Activos) corresponding to a user identity.
-      operationId: getAllCustomerTransactions
-      parameters:
-        - name: customerId
-          in: path
-          required: true
-          description: Unique customer hexadecimal string identifier key
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Continuous reactive array list stream of global historical data.
+          description: Invalid transaction payload.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ProductTransaction'
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/transactions/customer/{customerId}/product/{referenceNumber}:
     get:
-      summary: Query strict descending chronological records for an isolated bank product
-      description: Resolves the business query parameter requirement by compiling sorted lists mapping exclusively onto a target reference number.
+      summary: Get chronological movement history for a specific customer product
+      description: Returns all transactions for a specific account number, credit number, or card number belonging to a customer, ordered from newest to oldest.
       operationId: getProductHistory
       parameters:
         - name: customerId
           in: path
           required: true
+          description: Customer hexadecimal identifier
           schema:
             type: string
+            example: 65f1a2b3c4d5e6f7a8b9c001
         - name: referenceNumber
           in: path
           required: true
-          description: Targeted account number or credit card 16-digit primary identifier string
+          description: Account number (ACC-...), Credit number (CRD-...), or Card number
           schema:
             type: string
+            example: ACC-A2B3C4D5
       responses:
         '200':
-          description: Sorted historical data stream fetched from index nodes successfully.
+          description: Descending chronological stream of product movements.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/ProductTransaction'
+
+  /api/transactions/customer/{customerId}:
+    get:
+      summary: Get complete global transaction history for a customer
+      description: Retrieves every financial movement across all bank accounts, credits, and cards held by the customer.
+      operationId: getAllCustomerTransactions
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Customer hexadecimal identifier
+          schema:
+            type: string
+            example: 65f1a2b3c4d5e6f7a8b9c001
+      responses:
+        '200':
+          description: Complete chronological customer ledger retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductTransaction'
+
+  /api/transactions/reports/product:
+    get:
+      summary: Generate complete general report by product type within a date range
+      description: Filters and returns all bank transactions for a given product category (BANK_ACCOUNT, CREDIT, or CREDIT_CARD) between two ISO-8601 timestamps.
+      operationId: getProductReportByDateRange
+      parameters:
+        - name: productType
+          in: query
+          required: true
+          description: Product category to filter
+          schema:
+            type: string
+            enum: [BANK_ACCOUNT, CREDIT, CREDIT_CARD]
+            example: BANK_ACCOUNT
+        - name: start
+          in: query
+          required: true
+          description: Start timestamp in ISO-8601 format (YYYY-MM-DDTHH:mm:ss)
+          schema:
+            type: string
+            format: date-time
+            example: "2026-11-01T00:00:00"
+        - name: end
+          in: query
+          required: true
+          description: End timestamp in ISO-8601 format (YYYY-MM-DDTHH:mm:ss)
+          schema:
+            type: string
+            format: date-time
+            example: "2026-11-30T23:59:59"
+      responses:
+        '200':
+          description: Filtered general product report generated.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductTransaction'
+        '400':
+          description: Invalid query parameters or date format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/transactions/reports/card/{cardNumber}/last10:
+    get:
+      summary: Get the last 10 movements of a Debit Card or Credit Card
+      description: Retrieves the 10 most recent transactions associated with a 16-digit Debit Card or Credit Card number, sorted descending by timestamp.
+      operationId: getLast10CardMovements
+      parameters:
+        - name: cardNumber
+          in: path
+          required: true
+          description: 16-digit Debit Card or Credit Card number
+          schema:
+            type: string
+            example: "4558111122223333"
+      responses:
+        '200':
+          description: Top 10 most recent card transactions retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductTransaction'
+        '400':
+          description: Invalid card number parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -91,10 +175,10 @@ components:
       properties:
         id:
           type: string
-          example: 65f1a2b3c4d5e6f7a8b9c301
+          example: 6736a1b2c3d4e5f6a7b80001
         transactionId:
           type: string
-          example: TXN-20261110-8890
+          example: TXN-9A8B7C6D5E4F
         customerId:
           type: string
           example: 65f1a2b3c4d5e6f7a8b9c001
@@ -107,7 +191,11 @@ components:
 
     BankProduct:
       type: object
-      description: Domain configuration matching Java 27 structural records.
+      required:
+        - id
+        - type
+        - subType
+        - referenceNumber
       properties:
         id:
           type: string
@@ -118,32 +206,44 @@ components:
           example: BANK_ACCOUNT
         subType:
           type: string
-          enum: [SAVINGS, CURRENT, FIXED_TERM, PERSONAL_CREDIT, BUSINESS_CREDIT]
+          enum: [SAVINGS, CURRENT, FIXED_TERM, PERSONAL_CREDIT, BUSINESS_CREDIT, PERSONAL_CREDIT_CARD, BUSINESS_CREDIT_CARD]
           example: SAVINGS
         referenceNumber:
           type: string
-          example: ACC-9988776655
+          example: ACC-A2B3C4D5
+        cardNumber:
+          type: string
+          nullable: true
+          description: Populated when the operation was performed using a Debit Card or Credit Card.
+          example: "4558111122223333"
 
     TransactionOperation:
       type: object
+      required:
+        - type
+        - amount
+        - currency
       properties:
         type:
           type: string
-          enum: [DEPOSIT, WITHDRAWAL, CREDIT_PAYMENT, CARD_CONSUMPTION, CARD_PAYMENT]
-          example: WITHDRAWAL
+          enum: [DEPOSIT, WITHDRAWAL, DEBIT_CARD_PAYMENT, CREDIT_PAYMENT, CARD_CONSUMPTION, CARD_PAYMENT]
+          example: DEBIT_CARD_PAYMENT
         amount:
           type: number
           format: double
-          example: 120.00
+          example: 85.50
         currency:
           type: string
           example: PEN
         description:
           type: string
-          example: Branch ATM withdrawal operation
+          example: Supermarket POS purchase
 
     AuditData:
       type: object
+      required:
+        - sourceService
+        - timestamp
       properties:
         sourceService:
           type: string
@@ -152,5 +252,20 @@ components:
         timestamp:
           type: string
           format: date-time
-          example: '2026-11-10T11:50:00Z'
+          example: "2026-11-15T02:10:00"
 
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Invalid date range parameters
